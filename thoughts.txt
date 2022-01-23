@@ -1,0 +1,15 @@
+
+
+1. Write code to mmap a big file to read in chunks in parallel.
+2. Find start and end line number for each chunk
+3. Count words each line parallel and write to its own file.
+4. Let one thread merge all files. Since we are dealing with data in 
+   files where order is important. Multiple threads can not help here.
+
+
+1. Every chunk will create file with word frequency per line.
+2. Every chunk will Lexigraphically sort 
+3. Merge sort 2 files into one maintaining the sorted property.
+4. Repeat step 3 until there is only one file.
+
+
