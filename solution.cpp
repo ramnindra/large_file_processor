@@ -48,9 +48,9 @@ static void* chunk_worker_thread(void *thread_data)
         return NULL;
     }
     char* ptr = cdata->chunk_start;
-    int previsspace = 1;
+    bool previsspace = 1;
     while(ptr <= cdata->chunk_end) {
-        int space = isspace(*ptr);
+        bool space = isspace(*ptr);
         if (space == 0 && (previsspace == 1))
             word_count++;
         previsspace = space;
