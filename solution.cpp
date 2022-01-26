@@ -11,6 +11,10 @@
 #include <sys/stat.h> // for fstat
 #include <strings.h>
 #include <unistd.h>
+#include <iomanip>
+#include <chrono>
+#include <thread>
+
 
 
 #define THREAD_COUNT 4
@@ -23,6 +27,15 @@ typedef struct {
     int line_number_start;
     int line_number_end;
 } chunk_thread_data;
+/*
+    // Starting time for the clock
+    auto start = high_resolution_clock::now();
+
+    // Ending time for the clock
+    auto stop = high_resolution_clock::now();
+
+    auto duration = duration_cast<microseconds>(stop - start);
+*/
 
 static void* chunk_worker_thread(void *thread_data) 
 {
@@ -140,6 +153,8 @@ bool process_file(char* path)
         fclose(fp);
         if (line)
             free(line);
+        //delele the file
+        remove(path);
     }
     fclose(file1_fp);
     //munmap
@@ -149,13 +164,26 @@ bool process_file(char* path)
     return true;
 }
 
+void displayTime(std::chrono::time_point<std::chrono::high_resolution_clock>& start)
+{
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    std::cout << "Start time: " << std::chrono::duration_cast<std::chrono::microseconds>(start.time_since_epoch()).count() << std::endl;
+    std::cout << "End time: " << std::chrono::duration_cast<std::chrono::microseconds>(stop.time_since_epoch()).count() << std::endl;
+    std::cout << "Time taken : " << duration.count() << " microseconds" << std::endl;
+}
+
 int main(int argc, char *argv[]) 
 {
+    // Starting time for the clock
+    auto start = std::chrono::high_resolution_clock::now();
     if (argc != 2) 
     {
         std::cout << "Not correct number of argments passed\n";
         return -1;
     }
     process_file(argv[1]);
+    // Ending time for the clock
+    displayTime(start);
     return 0;
 } 
