@@ -7,9 +7,11 @@
 #include <iostream>
 #include <fcntl.h>
 #include <pthread.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
+#include <sys/mman.h> // for mmap()
+#include <sys/stat.h> // for fstat
 #include <strings.h>
+#include <unistd.h>
+
 
 #define THREAD_COUNT 4
 
@@ -46,8 +48,9 @@ static void* chunk_worker_thread(void *thread_data)
         }
         ptr++;
     }
-    std::cout << "start = " << static_cast<void*>(cdata->chunk_start) << " ";
-    std::cout << "end = " << static_cast<void*>(cdata->chunk_end) << " ";
+    fclose(fp);
+    //std::cout << "start = " << static_cast<void*>(cdata->chunk_start) << " ";
+    //std::cout << "end = " << static_cast<void*>(cdata->chunk_end) << " ";
     return NULL;
 }
 
@@ -70,7 +73,7 @@ bool process_file(char* path)
     char *mmap_addr_start = (char*)mmap(NULL, total_bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     char *mmap_addr_end = mmap_addr_start + total_bytes;
 
-    std::cout << "total_bytes " << total_bytes << std::endl;
+    //std::cout << "total_bytes " << total_bytes << std::endl;
 
     char *chunks[THREAD_COUNT];
     for (int i = 0; i < THREAD_COUNT; i++) {
@@ -81,7 +84,7 @@ bool process_file(char* path)
             }
             chunks[i]++;
         }
-        std::cout << "Addr Chunk Thread " << i << " : " << static_cast<void*>(chunks[i]) << std::endl;
+        //std::cout << "Addr Chunk Thread " << i << " : " << static_cast<void*>(chunks[i]) << std::endl;
     }
     for (int i = 0; i < THREAD_COUNT; i++) {
         char *chunk_start = chunks[i];
@@ -108,12 +111,37 @@ bool process_file(char* path)
             thread_data[i].line_number_end = thread_data[i].line_number_start + thread_data[i].number_of_lines;
         }
         total_lines += thread_data[i].number_of_lines;
-        std::cout << "Chunk Thread " << i << " : start = " << thread_data[i].line_number_start << 
-                     " end = " << thread_data[i].line_number_end << std::endl;
+        //std::cout << "Chunk Thread " << i << " : start = " << thread_data[i].line_number_start << 
+          //           " end = " << thread_data[i].line_number_end << std::endl;
     }
 
-    std::cout << "\nTotal Lines : " << total_lines << std::endl;
+    //std::cout << "\nTotal Lines : " << total_lines << std::endl;
+    close(fd);
 
+    int line_num = 1;
+    FILE* file1_fp = fopen("file1.txt", "w+");
+    // Merge all files into one in order
+    for (int i = 0; i < THREAD_COUNT; i++) {
+        char path[256] = "";
+        sprintf(path, "%d.data", i);
+        FILE* fp = fopen(path, "r+");
+        if (fp == NULL) {
+            return NULL;
+        }
+        int wcount = 0;
+        char* line = NULL;
+        size_t len = 0;
+        while ((getline(&line, &len, fp)) != -1) {
+            // using fprintf() in all tests for consistency
+            fprintf(file1_fp, "%d %s", line_num, line);
+            line_num++;
+        }
+        //closing file pointer
+        fclose(fp);
+        if (line)
+            free(line);
+    }
+    fclose(file1_fp);
     //munmap
     if (munmap(mmap_addr_start, total_bytes) == -1) {
         return false;
