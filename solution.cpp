@@ -14,8 +14,10 @@
 #include <iomanip>
 #include <chrono>
 #include <thread>
+#include <unordered_map>
 
-
+#define FILE_1_NAME "file1"
+#define FILE_2_NAME "file2"
 
 #define THREAD_COUNT 4
 
@@ -40,29 +42,49 @@ typedef struct {
 static void* chunk_worker_thread(void *thread_data) 
 {
     int word_count = 0;
-    char path[256] = "";
+    char file_1_path[256] = "";
+    char file_2_path[256] = "";
+    char word[256] = "";
     chunk_thread_data *cdata = (chunk_thread_data *)thread_data;
-    sprintf(path, "%d.data", cdata->chunk_id);
-    FILE* fp = fopen(path, "w+");
-    if (fp == NULL) {
+    sprintf(file_1_path, "%s_%d.txt", FILE_1_NAME, cdata->chunk_id);
+    sprintf(file_2_path, "%s_%d.txt", FILE_2_NAME, cdata->chunk_id);
+    std::unordered_map<std::string, int> mymap; //good to have default size preallocated : it is a bottleneck
+    FILE* file_1_fp = fopen(file_1_path, "w+");
+    if (file_1_fp == NULL) {
+        return NULL;
+    }
+    FILE* file_2_fp = fopen(file_2_path, "w+");
+    if (file_2_fp == NULL) {
         return NULL;
     }
     char* ptr = cdata->chunk_start;
-    bool previsspace = 1;
+    int index = 0;
     while(ptr <= cdata->chunk_end) {
         bool space = isspace(*ptr);
-        if (space == 0 && (previsspace == 1))
-            word_count++;
-        previsspace = space;
-
+        if (space == true) {
+            if (index != 0) {
+                word_count++;
+                word[index] = '\0';
+                mymap[word]++;
+                index = 0;
+            }
+            //std::cout << "[" << word << "]" << std::endl;
+        } else {
+            word[index++] = *ptr;
+        }
         if (*ptr == '\n') {
+            index = 0;
             cdata->number_of_lines++;
-            fprintf(fp, "%d\n", word_count);
+            fprintf(file_1_fp, "%d\n", word_count);
             word_count = 0;
         }
         ptr++;
     }
-    fclose(fp);
+    fclose(file_1_fp);
+    for (auto i : mymap) {
+        fprintf(file_2_fp, "%s %d\n", i.first.c_str(), i.second);
+    }
+    fclose(file_2_fp);
     //std::cout << "start = " << static_cast<void*>(cdata->chunk_start) << " ";
     //std::cout << "end = " << static_cast<void*>(cdata->chunk_end) << " ";
     return NULL;
@@ -111,7 +133,7 @@ bool process_file(char* path)
         thread_data[i].chunk_id = i;
         pthread_create(&threads[i], NULL, chunk_worker_thread, &thread_data[i]);
     }
-    //Wait for worker threads to finish their job
+    //Wait for worker threads to finish their jobs
     for (int i = 0; i < THREAD_COUNT; i++) {
         pthread_join(threads[i], NULL);
     }
@@ -129,33 +151,33 @@ bool process_file(char* path)
           //           " end = " << thread_data[i].line_number_end << std::endl;
     }
 
-    //std::cout << "\nTotal Lines : " << total_lines << std::endl;
+    std::cout << "\nTotal Lines : " << total_lines << std::endl;
     close(fd);
 
     int line_num = 1;
     FILE* file1_fp = fopen("file1.txt", "w+");
     // Merge all files into one in order
     for (int i = 0; i < THREAD_COUNT; i++) {
-        char path[256] = "";
-        sprintf(path, "%d.data", i);
-        FILE* fp = fopen(path, "r+");
-        if (fp == NULL) {
+        char file_1_path[256] = "";
+        sprintf(file_1_path, "%s_%d.txt", FILE_1_NAME, i);
+        FILE* file_1_fp = fopen(file_1_path, "r+");
+        if (file_1_fp == NULL) {
             return NULL;
         }
         int wcount = 0;
         char* line = NULL;
         size_t len = 0;
-        while ((getline(&line, &len, fp)) != -1) {
+        while ((getline(&line, &len, file_1_fp)) != -1) {
             // using fprintf() in all tests for consistency
             fprintf(file1_fp, "%d %s", line_num, line);
             line_num++;
         }
         //closing file pointer
-        fclose(fp);
+        fclose(file_1_fp);
         if (line)
             free(line);
         //delele the file
-        remove(path);
+        remove(file_1_path);
     }
     fclose(file1_fp);
     //munmap
@@ -185,6 +207,6 @@ int main(int argc, char *argv[])
     }
     process_file(argv[1]);
     // Ending time for the clock
-    displayTime(start);
+    //displayTime(start);
     return 0;
 } 
