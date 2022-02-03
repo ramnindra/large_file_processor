@@ -3,26 +3,19 @@
 /*
  * Copyright Ram Nindra (ramnindra@yahoo.com)
  */
-
 #include <iostream>
-#include <fcntl.h>
-#include <pthread.h>
+#include <strings.h>
+#include <chrono>
+#include <cstring>
 #include <sys/mman.h> // for mmap()
 #include <sys/stat.h> // for fstat
-#include <strings.h>
 #include <unistd.h>
-#include <iomanip>
-#include <chrono>
-#include <thread>
-#include <map>
-#include <cstring>
-#include <stdio.h>
+#include <fcntl.h>
 #include <dirent.h>
-#include <stdio.h>
-#include <cstring>
-#include <bits/stdc++.h>
+#include <vector>
+#include <map>
 
-
+#define MAX_BUF_LEN 256
 #define FILE_1_NAME "file1"
 #define FILE_2_NAME "output/file2"
 #define DIR_OUTPUT_TEMP "./output"
@@ -30,7 +23,7 @@
 
 //Total RAM is roughly among all threads
 // in system with RAM 16G each thread will can use memory 3gb to 3.5g
-#define THREAD_COUNT 4
+#define THREAD_COUNT 8
 
 typedef struct {
     char *chunk_start;
@@ -43,25 +36,21 @@ typedef struct {
 
 typedef struct 
 {
-    char in_file1[256];
-    char in_file2[256];
-    char out_file[256]; 
+    char in_file1[MAX_BUF_LEN];
+    char in_file2[MAX_BUF_LEN];
+    char out_file[MAX_BUF_LEN]; 
 } merge_sort_data;
+
 /*
-// Starting time for the clock
-auto start = high_resolution_clock::now();
-
-// Ending time for the clock
-auto stop = high_resolution_clock::now();
-
-auto duration = duration_cast<microseconds>(stop - start);
-*/
+ * This function merges two sorted files into one in lexographically sorted order"
+ * time complexity O(m+n)
+ */
 static void* merge_sort_worker_thread(void *pthread_data) 
 {
-    char word1[256] = "";
+    char word1[MAX_BUF_LEN] = "";
     int count1 = 0;
     int ret1 = 1;
-    char word2[256] = "";
+    char word2[MAX_BUF_LEN] = "";
     int count2 = 0;
     int ret2 = 1;
     int ret = 0;
@@ -133,12 +122,15 @@ static void* merge_sort_worker_thread(void *pthread_data)
     return NULL;
 }
 
+/*
+ * This function finds frequency of each word and add them in a file in sorted form.
+ */
 static void* chunk_worker_thread(void *thread_data) 
 {
     int word_count = 0;
-    char file_1_path[256] = "";
-    char file_2_path[256] = "";
-    char word[256] = "";
+    char file_1_path[MAX_BUF_LEN] = "";
+    char file_2_path[MAX_BUF_LEN] = "";
+    char word[MAX_BUF_LEN] = "";
     chunk_thread_data *cdata = (chunk_thread_data *)thread_data;
     sprintf(file_1_path, "%s_%d.txt", FILE_1_NAME, cdata->chunk_id);
     sprintf(file_2_path, "%s_%d.txt", FILE_2_NAME, cdata->chunk_id);
@@ -162,7 +154,7 @@ static void* chunk_worker_thread(void *thread_data)
             if (index != 0) {
                 word_count++;
                 word[index] = '\0';
-                mymap[word]++;
+                mymap[word]++; //this is insert in map. insertion map is log(n), default std::map is lexographically sorted by keys
                 index = 0;
             }
             //std::cout << "[" << word << "]" << std::endl;
@@ -178,7 +170,7 @@ static void* chunk_worker_thread(void *thread_data)
         ptr++;
     }
     fclose(file_1_fp);
-    for (auto i : mymap) {
+    for (auto i : mymap) { //order of O(n)
         fprintf(file_2_fp, "%s %d\n", i.first.c_str(), i.second);
     }
     fclose(file_2_fp);
@@ -186,15 +178,19 @@ static void* chunk_worker_thread(void *thread_data)
     //std::cout << "end = " << static_cast<void*>(cdata->chunk_end) << " ";
     return NULL;
 }
-
+/*
+ * Lexographically sorted by string key. It sorts two files by one thread and write merged file in processing dir
+ * once all threads (each processing two files and writting one file) complete the processing, then next cycle starts
+ * and every iteration reduces the file count by half. process continues only one merged file is left in the directory.
+ */
 void merge_files_in_parallel(char* dirname)
 {
     DIR *d;
     int i  = 2;
-    char path[256] = "";
-    char file1[256];
-    char file2[256];
-    char cmd[256];
+    char path[MAX_BUF_LEN] = "";
+    char file1[MAX_BUF_LEN];
+    char file2[MAX_BUF_LEN];
+    char cmd[MAX_BUF_LEN];
     int counter = 0;
     struct dirent *dir;
     std::vector<pthread_t> threads;
@@ -309,7 +305,7 @@ bool process_file(char* path)
     FILE* file1_fp = fopen("file1.txt", "w+");
     // Merge all files into one in order
     for (int i = 0; i < THREAD_COUNT; i++) {
-        char file_1_path[256] = "";
+        char file_1_path[MAX_BUF_LEN] = "";
         sprintf(file_1_path, "%s_%d.txt", FILE_1_NAME, i);
         FILE* file_1_fp = fopen(file_1_path, "r+");
         if (file_1_fp == NULL) {
@@ -367,3 +363,4 @@ int main(int argc, char *argv[])
     system("rm -rf  processing");
     return 0;
 } 
+
