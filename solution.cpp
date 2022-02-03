@@ -71,19 +71,19 @@ static void* merge_sort_worker_thread(void *pthread_data)
         std::cout << "Error openning file " << thread_data->in_file1 << std::endl;
         return NULL;
     }
-    std::cout << "file 1 " << thread_data->in_file1 << std::endl;
+    //std::cout << "file 1 " << thread_data->in_file1 << std::endl;
     FILE* fp2 = fopen(thread_data->in_file2, "r+");
     if (fp2 == NULL) {
         std::cout << "Error openning file " << thread_data->in_file2 << std::endl;
         return NULL;
     }
-    std::cout << "file 2 " << thread_data->in_file2 << std::endl;
+    //std::cout << "file 2 " << thread_data->in_file2 << std::endl;
     FILE* fp = fopen(thread_data->out_file, "w+");
     if (fp == NULL) {
         std::cout << "Error openning file " << thread_data->out_file << std::endl;
         return NULL;
     }
-    std::cout << "file out " << thread_data->out_file << std::endl;
+    //std::cout << "file out " << thread_data->out_file << std::endl;
     int move1 = 1;
     int move2 = 1;
     while(ret1 != EOF && ret2 != EOF)
@@ -206,7 +206,6 @@ void merge_files_in_parallel(char* dirname)
                 if (dir->d_type != DT_DIR) {
                     if (counter % 2 == 1) {
                         strcpy(file2, dir->d_name);
-                        printf("file1=%s and file2=%s \n", file1, file2);
                         merge_sort_data thread_mergedata;
                         sprintf(path, "%s/%s", dirname, file1);
                         strcpy(thread_mergedata.in_file1, path);
@@ -217,11 +216,9 @@ void merge_files_in_parallel(char* dirname)
                         pthread_t thread;
                         pthread_create(&thread, NULL, merge_sort_worker_thread, &thread_mergedata);
                         threads.push_back(thread);
-                        sprintf(cmd, "rm -rf output/%s", file1);
-                        printf("Executing %s\n", cmd);
+                        sprintf(cmd, "rm -rf %s/%s", DIR_OUTPUT_TEMP, file1);
                         system(cmd);
-                        sprintf(cmd, "rm -rf output/%s", file2);
-                        printf("Executing %s\n", cmd);
+                        sprintf(cmd, "rm -rf %s/%s", DIR_OUTPUT_TEMP, file2);
                         system(cmd);
                         i++;
                     } else {
@@ -305,7 +302,7 @@ bool process_file(char* path)
         //           " end = " << thread_data[i].line_number_end << std::endl;
     }
 
-    std::cout << "\nTotal Lines : " << total_lines << std::endl;
+    //std::cout << "\nTotal Lines : " << total_lines << std::endl;
     close(fd);
 
     int line_num = 1;
@@ -347,8 +344,8 @@ void displayTime(std::chrono::time_point<std::chrono::high_resolution_clock>& st
 {
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-    std::cout << "Start time: " << std::chrono::duration_cast<std::chrono::microseconds>(start.time_since_epoch()).count() << std::endl;
-    std::cout << "End time: " << std::chrono::duration_cast<std::chrono::microseconds>(stop.time_since_epoch()).count() << std::endl;
+    //std::cout << "Start time: " << std::chrono::duration_cast<std::chrono::microseconds>(start.time_since_epoch()).count() << std::endl;
+    //std::cout << "End time: " << std::chrono::duration_cast<std::chrono::microseconds>(stop.time_since_epoch()).count() << std::endl;
     std::cout << "Time taken : " << duration.count() << " microseconds" << std::endl;
 }
 
@@ -365,7 +362,7 @@ int main(int argc, char *argv[])
     }
     process_file(argv[1]);
     // Ending time for the clock
-    //displayTime(start);
+    displayTime(start);
     system("rm -rf output");
     system("rm -rf  processing");
     return 0;
