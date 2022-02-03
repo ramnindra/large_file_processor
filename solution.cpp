@@ -14,12 +14,16 @@
 #include <iomanip>
 #include <chrono>
 #include <thread>
-#include <unordered_map>
+#include <map>
+#include <cstring>
+#include <stdio.h>
 
 #define FILE_1_NAME "file1"
 #define FILE_2_NAME "file2"
 
-#define THREAD_COUNT 4
+//Total RAM is roughly among all threads
+// in system with RAM 16G each thread will can use memory 3gb to 3.5g
+#define THREAD_COUNT 2
 
 typedef struct {
     char *chunk_start;
@@ -29,6 +33,13 @@ typedef struct {
     int line_number_start;
     int line_number_end;
 } chunk_thread_data;
+
+typedef struct 
+{
+    char in_file1[256];
+    char in_file2[256];
+    char out_file[256]; 
+} merge_sort_data;
 /*
     // Starting time for the clock
     auto start = high_resolution_clock::now();
@@ -38,6 +49,73 @@ typedef struct {
 
     auto duration = duration_cast<microseconds>(stop - start);
 */
+static void* merge_sort_worker_thread(void *pthread_data) 
+{
+    char word1[256] = "";
+    int count1 = 0;
+    int ret1 = 1;
+    char word2[256] = "";
+    int count2 = 0;
+    int ret2 = 1;
+    int ret = 0;
+    merge_sort_data* thread_data = (merge_sort_data*)pthread_data;
+    FILE* fp1 = fopen(thread_data->in_file1, "r+");
+    if (fp1 == NULL)
+        return NULL;
+    FILE* fp2 = fopen(thread_data->in_file2, "r+");
+    if (fp2 == NULL)
+        return NULL;
+    FILE* fp = fopen(thread_data->out_file, "w+");
+    if (fp == NULL)
+        return NULL;
+    int move1 = 1;
+    int move2 = 1;
+    while(ret1 != EOF && ret2 != EOF)
+    {
+        if (move1 == 1) {
+            ret1 = fscanf(fp1, "%s %d\n", word1, &count1);
+            if (ret1 == EOF) {
+                break;
+            }
+            move1 = 0;
+        }
+        if (move2 == 1) {
+            ret2 = fscanf(fp2, "%s %d\n", word2, &count2);
+            if (ret2 == EOF) {
+                break;
+            }
+            move2 = 0;
+        }
+        ret = strcmp(word1, word2);
+        if (ret == 0) {
+            move1 = 1;
+            move2 = 1;
+            fprintf(fp, "%s %d\n", word1, count1 + count2); 
+        } else if (ret < 0) {
+            move1 = 1;
+            fprintf(fp, "%s %d\n", word1, count1); 
+        } else {
+            move2 = 1;
+            fprintf(fp, "%s %d\n", word2, count2); 
+        }
+    }
+    while(ret1 != EOF) {
+        ret1 = fscanf(fp1, "%s %d\n", word1, &count1);
+        if (ret1 != EOF) {
+            fprintf(fp, "%s %d\n", word1, count1); 
+        }
+    }
+    while(ret2 != EOF) {
+        ret2 = fscanf(fp2, "%s %d\n", word2, &count2);
+        if (ret2 != EOF) {
+            fprintf(fp, "%s %d\n", word2, count2); 
+        }
+    }
+    fclose(fp1);
+    fclose(fp2);
+    fclose(fp);
+    return NULL;
+}
 
 static void* chunk_worker_thread(void *thread_data) 
 {
@@ -48,7 +126,10 @@ static void* chunk_worker_thread(void *thread_data)
     chunk_thread_data *cdata = (chunk_thread_data *)thread_data;
     sprintf(file_1_path, "%s_%d.txt", FILE_1_NAME, cdata->chunk_id);
     sprintf(file_2_path, "%s_%d.txt", FILE_2_NAME, cdata->chunk_id);
-    std::unordered_map<std::string, int> mymap; //good to have default size preallocated : it is a bottleneck
+    //good to have default size preallocated : it is a bottleneck
+    //this map is sorted by default by key operation < 
+    //insertion in this map is order of log(n) where is n is current map size
+    std::map<std::string, int> mymap; 
     FILE* file_1_fp = fopen(file_1_path, "w+");
     if (file_1_fp == NULL) {
         return NULL;
@@ -184,6 +265,24 @@ bool process_file(char* path)
     if (munmap(mmap_addr_start, total_bytes) == -1) {
         return false;
     }
+    for (int i = 0; i < THREAD_COUNT; i=+2) {
+        merge_sort_data thread_mergedata;
+        char path[256] = "";
+        sprintf(path, "%s_%d.txt", FILE_2_NAME, i); 
+        strcpy(thread_mergedata.in_file1, path);
+        i++;
+        sprintf(path, "%s_%d.txt", FILE_2_NAME, i); 
+        strcpy(thread_mergedata.in_file2, path);
+        sprintf(path, "merged_file_%d.txt", i); 
+        strcpy(thread_mergedata.out_file, path);
+        pthread_t thread;
+        std::cout << " Calling merge thread" << std::endl;
+        pthread_create(&thread, NULL, merge_sort_worker_thread, &thread_mergedata);
+        //if (i == THREAD_COUNT - 1)
+        pthread_join(thread, NULL);
+        break;
+    }
+
     return true;
 }
 
