@@ -1,0 +1,50 @@
+
+In file size 4GB
+
+8 cores and 4 threads
+[ramnindra@localhost large_file_processor]$ g++ solution.cpp -lpthread && ./a.out inputfile 
+Time taken : 55903276 microseconds
+[ramnindra@localhost large_file_processor]$ g++ solution.cpp -lpthread && ./a.out inputfile 
+Time taken : 52314738 microseconds
+[ramnindra@localhost large_file_processor]$ vi solution.cpp 
+[ramnindra@localhost ~]$ ps -aef | grep a.out
+ramnind+    3456    3322 99 23:48 pts/0    00:00:17 ./a.out inputfile
+ramnind+    3464    3370  0 23:48 pts/1    00:00:00 grep --color=auto a.out
+[ramnindra@localhost ~]$ ps -T -p 3456
+    PID    SPID TTY          TIME CMD
+   3456    3456 pts/0    00:00:00 a.out
+   3456    3459 pts/0    00:00:08 a.out
+   3456    3460 pts/0    00:00:08 a.out
+   3456    3461 pts/0    00:00:08 a.out
+   3456    3462 pts/0    00:00:08 a.out
+[ramnindra@localhost ~]$ ps -T -p 3456
+    PID    SPID TTY          TIME CMD
+   3456    3456 pts/0    00:00:00 a.out
+   3456    3459 pts/0    00:00:28 a.out
+   3456    3460 pts/0    00:00:28 a.out
+   3456    3461 pts/0    00:00:28 a.out
+   3456    3462 pts/0    00:00:28 a.out
+[ramnindra@localhost ~]$
+
+8 cores and 8 threads
+[ramnindra@localhost large_file_processor]$ g++ solution.cpp -lpthread && ./a.out inputfile 
+Time taken : 34453713 microseconds
+[ramnindra@localhost large_file_processor]$ g++ solution.cpp -lpthread && ./a.out inputfile 
+Time taken : 34421757 microseconds
+[ramnindra@localhost large_file_processor]$ 
+[ramnindra@localhost ~]$ ps -aef | grep a.out
+ramnind+    3689    3322 99 23:52 pts/0    00:00:20 ./a.out inputfile
+ramnind+    3701    3370  0 23:52 pts/1    00:00:00 grep --color=auto a.out
+[ramnindra@localhost ~]$ ps -T -p 3689
+    PID    SPID TTY          TIME CMD
+   3689    3689 pts/0    00:00:00 a.out
+   3689    3692 pts/0    00:00:08 a.out
+   3689    3693 pts/0    00:00:08 a.out
+   3689    3694 pts/0    00:00:08 a.out
+   3689    3695 pts/0    00:00:08 a.out
+   3689    3696 pts/0    00:00:08 a.out
+   3689    3697 pts/0    00:00:08 a.out
+   3689    3698 pts/0    00:00:08 a.out
+   3689    3699 pts/0    00:00:08 a.out
+[ramnindra@localhost ~]$ 
+
