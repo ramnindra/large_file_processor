@@ -17,13 +17,20 @@
 #include <map>
 #include <cstring>
 #include <stdio.h>
+#include <dirent.h>
+#include <stdio.h>
+#include <cstring>
+#include <bits/stdc++.h>
+
 
 #define FILE_1_NAME "file1"
-#define FILE_2_NAME "file2"
+#define FILE_2_NAME "output/file2"
+#define DIR_OUTPUT_TEMP "./output"
+#define DIR_PROCESSING_TEMP "./processing"
 
 //Total RAM is roughly among all threads
 // in system with RAM 16G each thread will can use memory 3gb to 3.5g
-#define THREAD_COUNT 2
+#define THREAD_COUNT 4
 
 typedef struct {
     char *chunk_start;
@@ -41,13 +48,13 @@ typedef struct
     char out_file[256]; 
 } merge_sort_data;
 /*
-    // Starting time for the clock
-    auto start = high_resolution_clock::now();
+// Starting time for the clock
+auto start = high_resolution_clock::now();
 
-    // Ending time for the clock
-    auto stop = high_resolution_clock::now();
+// Ending time for the clock
+auto stop = high_resolution_clock::now();
 
-    auto duration = duration_cast<microseconds>(stop - start);
+auto duration = duration_cast<microseconds>(stop - start);
 */
 static void* merge_sort_worker_thread(void *pthread_data) 
 {
@@ -60,14 +67,23 @@ static void* merge_sort_worker_thread(void *pthread_data)
     int ret = 0;
     merge_sort_data* thread_data = (merge_sort_data*)pthread_data;
     FILE* fp1 = fopen(thread_data->in_file1, "r+");
-    if (fp1 == NULL)
+    if (fp1 == NULL) {
+        std::cout << "Error openning file " << thread_data->in_file1 << std::endl;
         return NULL;
+    }
+    std::cout << "file 1 " << thread_data->in_file1 << std::endl;
     FILE* fp2 = fopen(thread_data->in_file2, "r+");
-    if (fp2 == NULL)
+    if (fp2 == NULL) {
+        std::cout << "Error openning file " << thread_data->in_file2 << std::endl;
         return NULL;
+    }
+    std::cout << "file 2 " << thread_data->in_file2 << std::endl;
     FILE* fp = fopen(thread_data->out_file, "w+");
-    if (fp == NULL)
+    if (fp == NULL) {
+        std::cout << "Error openning file " << thread_data->out_file << std::endl;
         return NULL;
+    }
+    std::cout << "file out " << thread_data->out_file << std::endl;
     int move1 = 1;
     int move2 = 1;
     while(ret1 != EOF && ret2 != EOF)
@@ -171,6 +187,63 @@ static void* chunk_worker_thread(void *thread_data)
     return NULL;
 }
 
+void merge_files_in_parallel(char* dirname)
+{
+    DIR *d;
+    int i  = 2;
+    char path[256] = "";
+    char file1[256];
+    char file2[256];
+    char cmd[256];
+    int counter = 0;
+    struct dirent *dir;
+    std::vector<pthread_t> threads;
+    while(i > 1) {
+        i = 1;
+        d = opendir(dirname);
+        if (d) {
+            while ((dir = readdir(d)) != NULL) {
+                if (dir->d_type != DT_DIR) {
+                    if (counter % 2 == 1) {
+                        strcpy(file2, dir->d_name);
+                        printf("file1=%s and file2=%s \n", file1, file2);
+                        merge_sort_data thread_mergedata;
+                        sprintf(path, "%s/%s", dirname, file1);
+                        strcpy(thread_mergedata.in_file1, path);
+                        sprintf(path, "%s/%s", dirname, file2);
+                        strcpy(thread_mergedata.in_file2, path);
+                        sprintf(path, "%s/merged_file_%d.txt", DIR_PROCESSING_TEMP, counter);
+                        strcpy(thread_mergedata.out_file, path);
+                        pthread_t thread;
+                        pthread_create(&thread, NULL, merge_sort_worker_thread, &thread_mergedata);
+                        threads.push_back(thread);
+                        sprintf(cmd, "rm -rf output/%s", file1);
+                        printf("Executing %s\n", cmd);
+                        system(cmd);
+                        sprintf(cmd, "rm -rf output/%s", file2);
+                        printf("Executing %s\n", cmd);
+                        system(cmd);
+                        i++;
+                    } else {
+                        strcpy(file1, dir->d_name);
+                    }
+                    counter++;
+                }
+            }
+            closedir(d);
+            for (int i = 0; i < threads.size(); i++)
+                pthread_join((pthread_t)threads[i], NULL);
+            threads.clear();
+            sprintf(cmd, "mv %s/merge* %s &> /dev/null", DIR_PROCESSING_TEMP, DIR_OUTPUT_TEMP);
+            system(cmd);
+        }
+    }
+    sprintf(cmd, "mv %s/merge* file2.txt  &> /dev/null", DIR_OUTPUT_TEMP);
+    system(cmd);
+    return;
+}
+
+
 bool process_file(char* path)
 {
     pthread_t threads[THREAD_COUNT];
@@ -229,7 +302,7 @@ bool process_file(char* path)
         }
         total_lines += thread_data[i].number_of_lines;
         //std::cout << "Chunk Thread " << i << " : start = " << thread_data[i].line_number_start << 
-          //           " end = " << thread_data[i].line_number_end << std::endl;
+        //           " end = " << thread_data[i].line_number_end << std::endl;
     }
 
     std::cout << "\nTotal Lines : " << total_lines << std::endl;
@@ -265,24 +338,8 @@ bool process_file(char* path)
     if (munmap(mmap_addr_start, total_bytes) == -1) {
         return false;
     }
-    for (int i = 0; i < THREAD_COUNT; i=+2) {
-        merge_sort_data thread_mergedata;
-        char path[256] = "";
-        sprintf(path, "%s_%d.txt", FILE_2_NAME, i); 
-        strcpy(thread_mergedata.in_file1, path);
-        i++;
-        sprintf(path, "%s_%d.txt", FILE_2_NAME, i); 
-        strcpy(thread_mergedata.in_file2, path);
-        sprintf(path, "merged_file_%d.txt", i); 
-        strcpy(thread_mergedata.out_file, path);
-        pthread_t thread;
-        std::cout << " Calling merge thread" << std::endl;
-        pthread_create(&thread, NULL, merge_sort_worker_thread, &thread_mergedata);
-        //if (i == THREAD_COUNT - 1)
-        pthread_join(thread, NULL);
-        break;
-    }
-
+    char output[] = "./output";
+    merge_files_in_parallel(output);
     return true;
 }
 
@@ -297,6 +354,8 @@ void displayTime(std::chrono::time_point<std::chrono::high_resolution_clock>& st
 
 int main(int argc, char *argv[]) 
 {
+    system("mkdir -p output");
+    system("mkdir -p processing");
     // Starting time for the clock
     auto start = std::chrono::high_resolution_clock::now();
     if (argc != 2) 
@@ -307,5 +366,7 @@ int main(int argc, char *argv[])
     process_file(argv[1]);
     // Ending time for the clock
     //displayTime(start);
+    system("rm -rf output");
+    system("rm -rf  processing");
     return 0;
 } 
